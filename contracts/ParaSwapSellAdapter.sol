@@ -6,6 +6,7 @@ import {IParaSwapAugustus} from "./Interfaces/IParaSwapAugustus.sol";
 import {IParaSwapAugustusRegistry} from "./Interfaces/IParaSwapAugustusRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import 'hardhat/console.sol';
 
 /**
  * @title ParaSwapSellAdapter
@@ -61,8 +62,11 @@ contract ParaSwapSellAdapter {
         uint256 _balanceBeforeAssetTo = _assetToSwapTo.balanceOf(address(this));
 
         address _tokenTransferProxy = _augustus.getTokenTransferProxy();
-        _assetToSwapFrom.safeApprove(_tokenTransferProxy, 0);
-        _assetToSwapFrom.safeApprove(_tokenTransferProxy, _amountToSwap);
+        // The following line can be modified to use unlimited allowance
+        _assetToSwapFrom.safeIncreaseAllowance(_tokenTransferProxy, _amountToSwap);
+
+        console.log("Swap call data is: ");
+        console.logBytes(_swapCalldata);
 
         (bool _success, ) = address(_augustus).call(_swapCalldata);
         if (!_success) {

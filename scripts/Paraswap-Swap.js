@@ -1,10 +1,9 @@
+// ParaSwap API docs can be found at: https://app.swaggerhub.com/apis/paraswapv5/api/1.0
 const hre = require('hardhat');
-const { ethers } = hre;
-const { parseUnits } = ethers;
 const { ParaSwap } = require('paraswap');
 let paraSwap;
 
-let initParaswap = (networkId) => {
+let initParaswap = (networkId, ethers) => {
     paraSwap = new ParaSwap(networkId).setWeb3Provider(ethers);
 }
 
@@ -27,7 +26,7 @@ async function fetchRate(
         destTokenObj.address,
         srcAmount,
         userAddress,
-        SELL,
+        'SELL',
         srcTokenObj.decimals,
         destTokenObj.decimals
     );
@@ -36,7 +35,7 @@ async function fetchRate(
         throw new Error(priceRouteOrError.message);
     }
 
-    return priceRouteOrError;
+    return priceRouteOrError;    
 }
 
 /**
@@ -47,7 +46,7 @@ async function fetchRate(
  * @param {String} minAmount Minimum amount expected after swap
  * @param {Object} priceRoute Price route that we got from fetchRate to follow 
  * @param {String} userAddress Address of the swapper/seller
- * @param {String} receiver Address of the receiver
+ * @param {String} deadline Deadline for the transaction to take place (Unix timestamp format)
  */
 async function buildSwap(
     srcTokenObj,
@@ -55,21 +54,20 @@ async function buildSwap(
     srcAmount,
     minAmount,
     priceRoute,
-    userAddress,
-    receiver = userAddress,
+    userAddress
 ) {
-    // Decimals can be added as an argument if necessary
     const transactionRequestOrError = await paraSwap.buildTx(
-        srcToken.address,
-        destToken.address,
+        srcTokenObj.address,
+        destTokenObj.address,
         srcAmount,
         minAmount,
         priceRoute,
         userAddress,
-        undefined, // Partner is undefined (not required)
-        undefined, // Partner address is not required
-        undefined, // Partner fee bps is not required
-        receiver
+        undefined, // Remove this line after testing
+        undefined, // Remove this line after testing
+        undefined, // Remove this line after testing
+        userAddress, // Remove this line after testing
+        {ignoreChecks: true} // Remove this line after testing
     );
 
     if ("message" in transactionRequestOrError) {
@@ -101,29 +99,29 @@ async function getSwapTransaction(
 ) {
     try {
         const srcAmount = srcAmountBigNumber.toString();
-        const minAmount = (srcAmountBigNumber.mul(ethers.BigNumber.from(1 - slippage / 100))).toString();
-        
-        paraSwap = initParaswap(networkId);
-        
+        const minAmount = (srcAmountBigNumber.mul(ethers.BigNumber.from(100 - slippage)).div(ethers.BigNumber.from(100))).toString();
+
+        if (paraSwap === undefined)
+            paraSwap = initParaswap(networkId);
+
         const priceRoute = await fetchRate(
-            srcToken,
-            destToken,
+            srcTokenObj,
+            destTokenObj,
             srcAmount,
             userAddress
         );
 
+        console.log("Price route: ", priceRoute);
 
-        const transactionRequest = await buildSwap({
-            srcToken,
-            destToken,
+        const transactionRequest = await buildSwap(
+            srcTokenObj,
+            destTokenObj,
             srcAmount,
             minAmount,
             priceRoute,
             userAddress,
             ...rest
-        });
-
-        console.log("TransactionRequest: ", transactionRequest);
+        );
 
         return transactionRequest;
     } catch (error) {
@@ -132,15 +130,9 @@ async function getSwapTransaction(
     }
 }
 
-async function main() {
-    
-
-
-}
-
-main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+module.exports = {
+    initParaswap,
+    fetchRate,
+    buildSwap,
+    getSwapTransaction
+};
